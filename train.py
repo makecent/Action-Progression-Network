@@ -44,14 +44,8 @@ action = config.action
 
 # %% Parameters, Configuration, and Initialization
 model_name = now
-root = {'train': "/mnt/louis-consistent/Datasets/DFMAD-70/Images/train",
-        'test': "/mnt/louis-consistent/Datasets/DFMAD-70/Images/test"}
-
-annfile = {
-    'train': "/mnt/louis-consistent/Datasets/DFMAD-70/Annotations/train/{}.csv".format(action),
-    'test': "/mnt/louis-consistent/Datasets/DFMAD-70/Annotations/test/{}.csv".format(action)}
-
-
+root = "/mnt/louis-consistent/Datasets/DFMAD-70/Images/train"
+annfile = "/mnt/louis-consistent/Datasets/DFMAD-70/Annotations/train/{}.csv".format(action)
 
 output_path = '/mnt/louis-consistent/Saved/DFMAD-70_output'  # Directory to save model and history
 history_path = Path(output_path, action, 'History', model_name)
@@ -60,14 +54,14 @@ history_path.mkdir(parents=True, exist_ok=True)
 models_path.mkdir(parents=True, exist_ok=True)
 
 # %% Build dataset
+datalist = read_from_annfile(root, annfile, y_range=y_range, mode='rgb', ordinal=False, weighted=False, stack_length=1)
+dataset = build_dataset_from_slices(*datalist, batch_size=batch_size, shuffle=True)
 
-datalist = {x: read_from_annfile(root[x], annfile[x], y_range=y_range, mode='rgb', ordinal=False, weighted=False,
-                                 stack_length=1) for x in ['train', 'test']}
-
-train_dataset = build_dataset_from_slices(*datalist['train'], batch_size=batch_size, augment=None)
-test_dataset = build_dataset_from_slices(*datalist['test'], batch_size=batch_size, shuffle=False)
-
+data_size = tf.data.experimental.cardinality(dataset).numpy()
+val_dataset = dataset.take(int(0.3 * data_size))
+train_dataset = dataset.skip(int(0.3 * data_size))
 STEP_SIZE_TRAIN = tf.data.experimental.cardinality(train_dataset).numpy()
+
 # %% Build and compile model
 n_mae = normalize_mae(y_nums)  # make mae loss normalized into range 0 - 100.
 strategy = tf.distribute.MirroredStrategy()
@@ -83,42 +77,10 @@ with strategy.scope():
     model_checkpoint = ModelCheckpoint(str(models_path.joinpath('{epoch:02d}-{val_n_mae:.2f}.h5')), period=1)
     lr_sche = LearningRateScheduler(lr_schedule)
     model.compile(loss=loss, optimizer=tf.keras.optimizers.Adam(0.0001, decay=1e-3 / STEP_SIZE_TRAIN), metrics=[n_mae])
-    his = model.fit(train_dataset, validation_data=test_dataset, epochs=epochs,
-                          callbacks=[model_checkpoint, wandbcb, lr_sche], verbose=1)
+    his = model.fit(train_dataset, validation_data=val_dataset, epochs=epochs,
+                    callbacks=[model_checkpoint, wandbcb, lr_sche], verbose=1)
 
 # %% Save history to csv and images
 history = his.history
 save_history(history_path, history)
 plot_history(history_path, history)
-
-# %% Prediction on untrimmed videos
-import pandas as pd
-import numpy as np
-temporal_annotation = pd.read_csv(annfile['test'], header=None)
-video_names = temporal_annotation.iloc[:, 0].unique()
-predictions = {}
-ground_truth = {}
-for v in video_names:
-    gt = temporal_annotation.loc[temporal_annotation.iloc[:, 0] == v].iloc[:, 1:].values
-    ground_truth[v] = gt
-
-    video_path = Path(root['test'], v)
-    img_list = find_imgs(video_path)
-    ds = build_dataset_from_slices(img_list, batch_size=1, shuffle=False)
-    prediction = model.predict(ds, verbose=1)
-    predictions[v] = np.squeeze(prediction)
-
-# %% Detect actions
-import numpy as np
-
-action_detected = {}
-tps = {}
-for v, prediction in predictions.items():
-    ads = action_search(prediction, min_T=80, max_T=10, min_L=500)
-    action_detected[v] = ads
-    tps[v] = calc_truepositive(ads, ground_truth[v], 0.5)
-
-num_gt = sum([len(gt) for gt in ground_truth.values()])
-loss = np.vstack(list(action_detected.values()))[:, 2]
-tp_values = np.hstack(list(tps.values()))
-ap = average_precision(tp_values, num_gt, loss)
