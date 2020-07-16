@@ -30,6 +30,8 @@ task2_ground_truth = {}
 task1_action_detected = {}
 task2_action_detected = {}
 
+# The 3 arguments -- min_T, max_T, and min_L need to be tuned for best performance. We used parameters tuned based on
+# the performance on train and validation set.
 for v, prediction in task1_predictions.items():
     gt = task1_ta.loc[task1_ta.iloc[:, 0] == int(v)].iloc[:, 1:].values
     v = str(v)

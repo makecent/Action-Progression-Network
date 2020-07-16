@@ -9,19 +9,17 @@ import pandas as pd
 from .utils import *
 from matplotlib import pyplot as plt
 
-
 # Plot ap curves versus IoU
 with open("saved/task1_imagenet_ap", 'r') as f:
     task1_ap = json.load(f)
 with open("saved/task2_imagenet_ap", 'r') as f:
     task2_ap = json.load(f)
-with open("saved/rim_task2.csv", 'r') as f:
-    rim = np.loadtxt(f, delimiter=',')
+rim_ap = np.loadtxt("saved/rim_task2_ap.csv", delimiter=',')  # average precisions by Li et.al for task2
 
 plt.figure()
 plt.plot(np.array(list(task1_ap.keys())).astype(np.float), [i*100 for i in list(task1_ap.values())], 'r-', label='Action1')
 plt.plot(np.array(list(task1_ap.keys())).astype(np.float), [j*100 for j in list(task2_ap.values())], 'b--', label='Action2')
-plt.plot(np.array(list(task1_ap.keys())).astype(np.float), rim*100, 'g:', label='Action2 by [29]')
+plt.plot(np.array(list(task1_ap.keys())).astype(np.float), rim_ap * 100, 'g:', label='Action2 by [29]')
 plt.axis([0, 0.9, 0, 105])
 plt.grid(True)
 plt.legend()
