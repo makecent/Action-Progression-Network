@@ -165,6 +165,7 @@ def multi_mse(y_true, y_pred):
 
 
 def multi_mae(y_true, y_pred):
+    # if not use y_range 0-100, please normalize this metric manually for better visualization and comparison.
     import tensorflow as tf
     # indexing row of y_pred by action index stored in y_true. [batch_size, 2] --> [batch_size]
     y_pred = tf.gather_nd(y_pred, tf.expand_dims(tf.cast(y_true[:, 0], tf.int32), axis=-1), batch_dims=1)
