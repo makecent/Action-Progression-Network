@@ -19,9 +19,11 @@ import socket
 
 agent = socket.gethostname()
 AUTOTUNE = tf.data.experimental.AUTOTUNE
-fix_bug()
 now = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
 # %% wandb Initialization
+#######
+# if you don't want to use wandb for recording, just remove the sub-section and set parameters manually.
+#######
 default_config = dict(
     loss='mse',
     y_s=0,
@@ -54,7 +56,7 @@ history_path.mkdir(parents=True, exist_ok=True)
 models_path.mkdir(parents=True, exist_ok=True)
 
 # %% Build dataset
-datalist = read_from_annfile(root, annfile, y_range=y_range, mode='rgb', ordinal=False, weighted=False, stack_length=1)
+datalist = read_from_annfile(root, annfile, y_range=y_range, stack_length=1)
 dataset = build_dataset_from_slices(*datalist, batch_size=batch_size, shuffle=True)
 
 data_size = tf.data.experimental.cardinality(dataset).numpy()

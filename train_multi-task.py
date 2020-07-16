@@ -19,9 +19,11 @@ import socket
 
 agent = socket.gethostname()
 AUTOTUNE = tf.data.experimental.AUTOTUNE
-fix_bug()
 now = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
 # %% wandb Initialization
+#######
+# if you don't want to use wandb for recording, just remove the sub-section and set parameters manually.
+#######
 default_config = dict(
     y_s=0,
     y_e=100,
@@ -40,13 +42,8 @@ epochs = config.epochs
 
 # %% Parameters, Configuration, and Initialization
 model_name = now
-root = {'train': "/mnt/louis-consistent/Datasets/DFMAD-70/Images/train",
-        'test': "/mnt/louis-consistent/Datasets/DFMAD-70/Images/test"}
-
-anndir = {
-    'train': "/mnt/louis-consistent/Datasets/DFMAD-70/Annotations/train",
-    'test': "/mnt/louis-consistent/Datasets/DFMAD-70/Annotations/test/"}
-
+root = "/mnt/louis-consistent/Datasets/DFMAD-70/Images/train"
+anndir = "/mnt/louis-consistent/Datasets/DFMAD-70/Annotations/train"
 
 output_path = '/mnt/louis-consistent/Saved/DFMAD-70_output'  # Directory to save model and history
 history_path = Path(output_path, 'multi', 'History', model_name)
@@ -55,14 +52,14 @@ history_path.mkdir(parents=True, exist_ok=True)
 models_path.mkdir(parents=True, exist_ok=True)
 
 # %% Build dataset
+datalist = read_from_anndir(root, anndir, y_range=y_range, stack_length=1)
+dataset = build_dataset_from_slices(datalist, batch_size=batch_size, augment=None)
 
-datalist = {x: read_from_anndir(root[x], anndir[x], y_range=y_range, mode='rgb', ordinal=False, weighted=False,
-                                 stack_length=1) for x in ['train', 'test']}
-
-train_dataset = build_dataset_from_slices(*datalist['train'], batch_size=batch_size, augment=None)
-test_dataset = build_dataset_from_slices(*datalist['test'], batch_size=batch_size, shuffle=False)
-
+data_size = tf.data.experimental.cardinality(dataset).numpy()
+val_dataset = dataset.take(int(0.3 * data_size))
+train_dataset = dataset.skip(int(0.3 * data_size))
 STEP_SIZE_TRAIN = tf.data.experimental.cardinality(train_dataset).numpy()
+
 # %% Build and compile model
 n_mae = normalize_mae(y_nums)  # make mae loss normalized into range 0 - 100.
 strategy = tf.distribute.MirroredStrategy()
@@ -78,7 +75,7 @@ with strategy.scope():
     model_checkpoint = ModelCheckpoint(str(models_path.joinpath('{epoch:02d}-{val_multi_mae:.2f}.h5')), period=1)
     lr_sche = LearningRateScheduler(lr_schedule)
     model.compile(loss=multi_mse, optimizer=tf.keras.optimizers.Adam(0.0001, decay=1e-3 / STEP_SIZE_TRAIN), metrics=[multi_mae])
-    his = model.fit(train_dataset, validation_data=test_dataset, epochs=epochs,
+    his = model.fit(train_dataset, validation_data=val_dataset, epochs=epochs,
                     callbacks=[model_checkpoint, wandbcb, lr_sche], verbose=1)
 
 # %% Save history to csv and images
