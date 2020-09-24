@@ -3,6 +3,27 @@
 # File  : utils.py
 # Author: Chongkai LU
 # Date  : 12/7/2020
+import tensorflow as tf
+
+
+class BiasLayer(tf.keras.layers.Layer):
+    def __init__(self, units, *args, **kwargs):
+        super(BiasLayer, self).__init__(*args, **kwargs)
+        self.units = units
+
+    def build(self, input_shape):
+        self.bias = self.add_weight('bias',
+                                    shape=(input_shape[-1], self.units),
+                                    initializer='zeros',
+                                    trainable=True)
+
+    def get_config(self):
+        config = super().get_config().copy()
+        config.update({'units': self.units})
+        return config
+
+    def call(self, inputs):
+        return tf.repeat(tf.expand_dims(inputs, -1), self.units, axis=-1) + self.bias
 
 
 def normalize_mae(y_nums):
@@ -175,6 +196,14 @@ def multi_mae(y_true, y_pred):
 
     multi_mae_loss = tf.math.abs(y_true - y_pred)
     return multi_mae_loss
+
+
+def mae_od(y_true, y_pred):
+    import tensorflow as tf
+    predict_completeness = tf.math.count_nonzero(y_pred > 0.5, axis=-1)
+    true_completeness = tf.math.count_nonzero(y_true > 0.5, axis=-1)
+    mean_absolute_error = tf.math.abs(predict_completeness - true_completeness)
+    return mean_absolute_error
 
 
 def action_search(completeness_array, min_T, max_T, min_L):

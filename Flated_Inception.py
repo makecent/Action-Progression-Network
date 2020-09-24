@@ -5,6 +5,8 @@ The model is introduced in:
 Quo Vadis, Action Recognition? A New Model and the Kinetics Dataset
 Joao Carreira, Andrew Zisserman
 https://arxiv.org/abs/1705.07750v1
+
+This code is generated from https://github.com/dlpbc/keras-kinetics-i3d, it contains the weights link.
 """
 
 from __future__ import print_function
