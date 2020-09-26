@@ -30,7 +30,7 @@ default_config = dict(
     batch_size=32,
     stack_length=10,
     epochs=50,
-    action="task1",
+    action="task3",
     mode='rgb',
     pretrain=True,
     agent=agent
@@ -78,7 +78,7 @@ models_path.mkdir(parents=True, exist_ok=True)
 
 # %% Build dataset
 parse_function = parse_builder(i3d=True, mode=mode)
-datalist = {x: read_from_annfile(root[x], annfile[x], y_range=y_range, stack_length=stack_length, ordinal=True) for x in ('train', 'test')}
+datalist = {x: read_from_annfile(root[x], annfile[x], y_range=y_range, mode=mode, stack_length=stack_length, ordinal=True) for x in ('train', 'test')}
 
 train_dataset = build_dataset_from_slices(*datalist['train'], batch_size=batch_size, parse_func=parse_function, shuffle=True)
 val_dataset = build_dataset_from_slices(*datalist['test'], batch_size=batch_size, parse_func=parse_function, shuffle=False)
